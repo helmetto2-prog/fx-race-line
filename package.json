@@ -1,0 +1,11 @@
+{
+  "name": "fx-race-line",
+  "version": "1.0.0",
+  "description": "8通貨ペアFXレース結果を毎朝LINEに配信するボット",
+  "main": "send.js",
+  "type": "commonjs",
+  "scripts": {
+    "send": "node send.js"
+  },
+  "license": "MIT"
+}

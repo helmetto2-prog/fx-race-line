@@ -1,0 +1,35 @@
+name: FX Race Daily
+
+on:
+  schedule:
+    # 21:00 UTC = 06:00 JST（GitHub Actionsの無料cronは数分〜十数分遅れることがあります）
+    - cron: "0 21 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run FX race and send to LINE
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+        run: node send.js
+
+      - name: Commit updated history
+        run: |
+          git config user.name "fx-race-bot"
+          git config user.email "actions@github.com"
+          git add data/history.json
+          git diff --quiet --cached || git commit -m "chore: update race history [skip ci]"
+          git push
