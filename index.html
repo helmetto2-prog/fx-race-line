@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FXレース 🏇</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; overflow:hidden; }
+  body { background:#0c1024; font-family:'Segoe UI','Hiragino Sans','MS PGothic',sans-serif;
+         touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+  #wrap { position:relative; width:100%; height:100%; max-width:560px; margin:0 auto; }
+  canvas { display:block; width:100%; height:100%; }
+  .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+            overflow-y:auto; padding:18px 14px 30px; background:linear-gradient(#141a3aee,#0c1024f5); }
+  .hidden { display:none !important; }
+  h1 { color:#ffe27a; font-size:34px; margin:14px 0 2px; text-shadow:0 3px 12px #000a; }
+  .sub { color:#9fb0e8; font-size:13px; margin-bottom:14px; text-align:center; line-height:1.7; }
+  .card { width:100%; background:#182050; border:1px solid #2c3a7a; border-radius:14px;
+          padding:12px 14px; margin-bottom:10px; color:#dde; }
+  button { font-family:inherit; border:none; border-radius:12px; cursor:pointer; }
+  .btn-main { width:100%; padding:16px; font-size:20px; font-weight:bold; color:#332;
+              background:linear-gradient(#ffe27a,#f5b940); box-shadow:0 4px 14px #0008; margin-top:8px; }
+  .btn-main:disabled { filter:grayscale(1); opacity:.5; }
+  .btn-sub { width:100%; padding:13px; font-size:15px; font-weight:bold; color:#fff;
+             background:#2c3a7a; margin-top:10px; }
+  .btn-line { width:100%; padding:14px; font-size:16px; font-weight:bold; color:#fff;
+              background:#06C755; margin-top:10px; }
+  .horse-btn { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; margin:5px 0;
+               background:#182050; border:2px solid #2c3a7a; border-radius:12px; color:#dde; font-size:15px;
+               transition:transform .06s; }
+  .horse-btn:active { transform:scale(0.97); }
+  .horse-btn.sel { border-color:#ffe27a; background:#2a3068; box-shadow:0 0 12px #ffe27a55; }
+  .gate { width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+          font-weight:bold; font-size:14px; flex-shrink:0; }
+  .hname { flex:1; text-align:left; font-weight:bold; }
+  .hodds { color:#ffb0c0; font-weight:bold; font-size:14px; }
+  .pts { color:#7CFC00; font-weight:bold; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  td { padding:6px 4px; border-bottom:1px solid #2c3a7a; }
+  tr.me td { background:#3a3510; color:#ffe27a; font-weight:bold; }
+  .up { color:#ff8a9a; } .down { color:#7ec8ff; }
+  #banner { position:absolute; top:0; left:0; right:0; background:#c0392b; color:#fff; font-size:12px;
+            padding:6px 10px; z-index:99; display:none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="c"></canvas>
+<div id="banner"></div>
+
+<!-- タイトル -->
+<div id="scr-title" class="screen">
+  <div style="font-size:64px;margin-top:8vh">🏇</div>
+  <h1>FXレース</h1>
+  <div class="sub">8つの通貨ペアがお馬さんになって毎日レース！<br>着順は<b>本物の為替の値動き</b>で決まるよ</div>
+  <div class="card" id="race-info">📡 本日のレースデータを取得中…</div>
+  <button class="btn-main" id="btn-to-bet" disabled>レースへ進む</button>
+  <div class="sub" style="margin-top:14px">持ちポイント: <span class="pts" id="pts-title">1000</span> P</div>
+</div>
+
+<!-- 出馬表・賭け -->
+<div id="scr-bet" class="screen hidden">
+  <h1 style="font-size:24px;margin-top:4px">🏇 本日の出馬表</h1>
+  <div class="sub" id="bet-date"></div>
+  <div id="horse-list" style="width:100%"></div>
+  <button class="btn-main" id="btn-start" disabled>賭ける馬を選んでね</button>
+  <div class="sub" style="margin-top:10px">賭け金 100P ／ 持ちP: <span class="pts" id="pts-bet"></span> P<br>1着的中でオッズ倍のポイントGET！</div>
+</div>
+
+<!-- 結果 -->
+<div id="scr-result" class="screen hidden">
+  <h1 style="font-size:26px;margin-top:6px" id="res-title">レース結果</h1>
+  <div class="sub" id="res-sub"></div>
+  <div class="card"><table id="res-table"></table></div>
+  <div class="card" id="res-payout" style="text-align:center;font-size:16px"></div>
+  <button class="btn-line" id="btn-share">LINEで結果をシェア 💬</button>
+  <button class="btn-sub" id="btn-again">🔁 もう一回観る（賭け直し）</button>
+  <div class="sub" style="margin-top:12px">レース結果は毎日あさ変わるよ。また明日！</div>
+</div>
+</div>
+
+<script>
+'use strict';
+/* ==================== 基盤 ==================== */
+const C = document.getElementById('c'), ctx = C.getContext('2d');
+let W = 480, H = 800, DPR = 1;
+function fit(){
+  const el = document.getElementById('wrap');
+  DPR = Math.min(2, window.devicePixelRatio||1);
+  W = el.clientWidth; H = el.clientHeight;
+  C.width = W*DPR; C.height = H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', fit); fit();
+
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+// 文字列→シード → 乱数（毎日同じ結果を全員で共有するため）
+function strSeed(s){ let h=1779033703^s.length; for(let i=0;i<s.length;i++){ h=Math.imul(h^s.charCodeAt(i),3432918353); h=h<<13|h>>>19; } return h>>>0; }
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+// ---- SFX (WebAudio) ----
+const SFX=(function(){
+  let ac=null,master=null,on=true;
+  const midi=n=>440*Math.pow(2,(n-69)/12);
+  function tone(f,d,type,v){ if(!ac)return; const t=ac.currentTime+0.01,o=ac.createOscillator(),g=ac.createGain();
+    o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0006,t+d);o.connect(g).connect(master);o.start(t);o.stop(t+d+0.03); }
+  function noise(v,freq,d){ if(!ac)return; const t=ac.currentTime+0.01,b=ac.createBuffer(1,1024,ac.sampleRate),dt=b.getChannelData(0);
+    for(let i=0;i<dt.length;i++)dt[i]=Math.random()*2-1; const s=ac.createBufferSource();s.buffer=b;
+    const f=ac.createBiquadFilter();f.type='bandpass';f.frequency.value=freq;const g=ac.createGain();
+    g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);s.connect(f).connect(g).connect(master);s.start(t);s.stop(t+d+0.05); }
+  return {
+    ensure(){ try{ if(!ac){ const A=window.AudioContext||window.webkitAudioContext; if(!A)return;
+      ac=new A(); master=ac.createGain(); master.gain.value=on?0.2:0; master.connect(ac.destination); }
+      if(ac.state==='suspended')ac.resume(); }catch(e){} },
+    blip(){ tone(660,0.05,'square',0.06); },
+    pick(){ tone(520,0.07,'square',0.07); tone(780,0.07,'triangle',0.05); },
+    fanfare(){ [60,64,67,72,67,72,76].forEach((m,i)=>setTimeout(()=>tone(midi(m),0.22,'square',0.11),i*130)); },
+    gallop(){ noise(0.07,900,0.06); },
+    goal(){ [72,76,79,84].forEach((m,i)=>setTimeout(()=>tone(midi(m),0.3,'square',0.12),i*110)); },
+    win(){ [60,64,67,72,76,79,84].forEach((m,i)=>setTimeout(()=>tone(midi(m),0.25,'square',0.12),i*100)); },
+    lose(){ [67,63,60,55].forEach((m,i)=>setTimeout(()=>tone(midi(m),0.25,'sawtooth',0.1),i*140)); },
+    countdown(){ tone(440,0.15,'square',0.1); },
+    go(){ tone(880,0.4,'square',0.13); },
+  };
+})();
+document.addEventListener('pointerdown',()=>SFX.ensure(),{passive:true});
+
+// ---- Store ----
+const Store={
+  getPts(){ const v=localStorage.getItem('fxrace_pts'); return v===null?1000:+v; },
+  setPts(v){ localStorage.setItem('fxrace_pts',v); },
+};
+
+/* ==================== データ ==================== */
+const PAIR_DEFS=[
+  { gate:1, pair:'ドル円',        code:'USD/JPY', col:'#ffffff', tcol:'#333' },
+  { gate:2, pair:'ユーロ円',      code:'EUR/JPY', col:'#222222', tcol:'#fff' },
+  { gate:3, pair:'ポンド円',      code:'GBP/JPY', col:'#e74c3c', tcol:'#fff' },
+  { gate:4, pair:'豪ドル円',      code:'AUD/JPY', col:'#3498db', tcol:'#fff' },
+  { gate:5, pair:'NZドル円',      code:'NZD/JPY', col:'#f1c40f', tcol:'#333' },
+  { gate:6, pair:'スイスフラン円', code:'CHF/JPY', col:'#2ecc71', tcol:'#333' },
+  { gate:7, pair:'ユーロドル',    code:'EUR/USD', col:'#e67e22', tcol:'#fff' },
+  { gate:8, pair:'ポンドドル',    code:'GBP/USD', col:'#ff9ff3', tcol:'#333' },
+];
+
+let RACE=null;   // {date, entries:[{...def, change, odds, rank, T}], practice}
+let bet=null;    // 選んだ馬 (entriesの要素)
+let pts=Store.getPts();
+
+function pairsFromRates(r){
+  return {
+    'USD/JPY': r.JPY, 'EUR/JPY': r.JPY/r.EUR, 'GBP/JPY': r.JPY/r.GBP,
+    'AUD/JPY': r.JPY/r.AUD, 'NZD/JPY': r.JPY/r.NZD, 'CHF/JPY': r.JPY/r.CHF,
+    'EUR/USD': 1/r.EUR, 'GBP/USD': 1/r.GBP,
+  };
+}
+async function fetchJSON(url){ const res=await fetch(url); if(!res.ok) throw new Error(res.status); return res.json(); }
+
+async function loadRace(){
+  const info=document.getElementById('race-info');
+  try{
+    const latest=await fetchJSON('https://api.frankfurter.app/latest?base=USD&symbols=JPY,EUR,GBP,AUD,NZD,CHF');
+    const d=new Date(latest.date+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-1);
+    const prevDate=d.toISOString().slice(0,10);
+    const prev=await fetchJSON(`https://api.frankfurter.app/${prevDate}?base=USD&symbols=JPY,EUR,GBP,AUD,NZD,CHF`);
+    const cur=pairsFromRates(latest.rates), old=pairsFromRates(prev.rates);
+    buildRace(latest.date, code=>((cur[code]-old[code])/old[code])*100, false);
+    info.innerHTML=`📅 <b>${latest.date}</b> のレース<br>為替の実データで着順が決まります（${prev.date}→${latest.date}の変化率）`;
+  }catch(e){
+    // オフライン等 → 練習レース（結果はランダム・毎時変わる）
+    const seedStr='practice-'+Math.floor(Date.now()/3600000);
+    const rng=mulberry32(strSeed(seedStr));
+    buildRace('練習レース', ()=> (rng()-0.5)*1.6, true);
+    info.innerHTML='⚠️ データを取得できなかったので<b>練習レース</b>（ランダム着順）で開催します';
+  }
+  document.getElementById('btn-to-bet').disabled=false;
+  document.getElementById('btn-to-bet').textContent='レースへ進む 🏇';
+}
+
+function buildRace(dateStr, changeOf, practice){
+  const rng=mulberry32(strSeed('fxrace-'+dateStr));
+  const entries=PAIR_DEFS.map(def=>{
+    const change=changeOf(def.code);
+    return {...def, change, tie:rng()*1e-6, odds:0};
+  });
+  // オッズ（1.5〜12.0 日替わりシード）
+  entries.forEach(e=>{ e.odds=Math.round((1.5+rng()*10.5)*10)/10; });
+  // 着順: 変化率が大きい順（同率はシードで決着）
+  const ranked=[...entries].sort((a,b)=>(b.change+b.tie)-(a.change+a.tie));
+  ranked.forEach((e,i)=>{ e.rank=i+1; e.T=17.5+i*0.55+rng()*0.3; }); // ゴールタイム(秒)
+  RACE={date:dateStr, entries, ranked, practice, allFlat:entries.every(e=>Math.abs(e.change)<1e-9)};
+}
+
+/* ==================== 画面遷移 ==================== */
+const scr={title:document.getElementById('scr-title'),bet:document.getElementById('scr-bet'),result:document.getElementById('scr-result')};
+function show(name){ Object.entries(scr).forEach(([k,el])=>el.classList.toggle('hidden',k!==name)); }
+function updatePts(){ document.getElementById('pts-title').textContent=pts;
+  const pb=document.getElementById('pts-bet'); if(pb)pb.textContent=pts; }
+
+document.getElementById('btn-to-bet').onclick=()=>{ SFX.blip(); buildBetScreen(); show('bet'); };
+
+function buildBetScreen(){
+  if(pts<100){ pts=500; Store.setPts(pts); } // 救済: 0になったら500P支給
+  updatePts();
+  document.getElementById('bet-date').innerHTML=
+    (RACE.practice?'🎲 練習レース（ランダム）':'📅 '+RACE.date+' 本日のレース')+
+    (RACE.allFlat?'<br>※市場お休み中のため全馬互角！':'');
+  const list=document.getElementById('horse-list'); list.innerHTML='';
+  RACE.entries.forEach(e=>{
+    const b=document.createElement('button'); b.className='horse-btn';
+    b.innerHTML=`<span class="gate" style="background:${e.col};color:${e.tcol}">${e.gate}</span>
+      <span class="hname">🏇 ${e.pair}<br><small style="color:#8aa;font-weight:normal">${e.code}</small></span>
+      <span class="hodds">${e.odds.toFixed(1)}倍</span>`;
+    b.onclick=()=>{ SFX.pick(); bet=e;
+      list.querySelectorAll('.horse-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+      const s=document.getElementById('btn-start'); s.disabled=false; s.textContent=`${e.pair} に100P賭けてスタート！`; };
+    list.appendChild(b);
+  });
+  const s=document.getElementById('btn-start'); s.disabled=true; s.textContent='賭ける馬を選んでね';
+  s.onclick=()=>{ if(!bet)return; pts-=100; Store.setPts(pts); SFX.fanfare(); startRace(); };
+}
+
+document.getElementById('btn-again').onclick=()=>{ SFX.blip(); bet=null; buildBetScreen(); show('bet'); };
+document.getElementById('btn-share').onclick=()=>{
+  const w=RACE.ranked[0];
+  const hit=bet && bet.rank===1;
+  const txt=`🏇FXレース(${RACE.date})\n1着は ${w.pair}！\n私は${bet?bet.pair:'?'}に賭けて${hit?'的中🎯 +'+Math.floor(100*bet.odds)+'P':'ハズレ😂'}\nキミも挑戦→ https://helmetto2-prog.github.io/fx-race-line/`;
+  location.href='https://line.me/R/share?text='+encodeURIComponent(txt);
+};
+
+/* ==================== レース ==================== */
+let race=null; // 実行中のレース状態
+const COURSE=1000; // m
+
+function startRace(){
+  show('title'); Object.values(scr).forEach(el=>el.classList.add('hidden')); // 全HTML非表示=canvas観戦
+  const rng=mulberry32(strSeed('anim-'+RACE.date+'-'+Math.floor(Math.random()*1e9)));
+  race={
+    t:-3.5, // カウントダウン3秒
+    horses:RACE.entries.map(e=>({e, p:0, ph:rng()*6.28, amp:14+rng()*22, f:0.25+rng()*0.3, goalT:null, bob:rng()*6.28})),
+    bg:0, finished:false, endTimer:0, comment:'', commentT:0, gallopT:0,
+  };
+  requestAnimationFrame(raceLoop);
+}
+
+let lastT=0;
+function raceLoop(t){
+  if(!race) return;
+  const dt=lastT?Math.min(50,t-lastT):16; lastT=t;
+  updateRace(dt/1000);
+  renderRace();
+  if(race) requestAnimationFrame(raceLoop); else lastT=0;
+}
+
+function updateRace(ds){
+  const r=race; const prevT=r.t; r.t+=ds;
+  // カウントダウン音
+  for(let n=3;n>=1;n--){ const tt=-n; if(prevT<tt&&r.t>=tt) SFX.countdown(); }
+  if(prevT<0&&r.t>=0) SFX.go();
+  if(r.t<0) return;
+
+  // 蹄の音
+  r.gallopT+=ds; if(r.gallopT>0.22&&!r.finished){ r.gallopT=0; SFX.gallop(); }
+
+  let allDone=true;
+  for(const h of r.horses){
+    const T=h.e.T;
+    const base=COURSE*Math.min(1.06,r.t/T);            // 平均ペース（Tでゴール）
+    const wob=(r.t<T-1.2)?Math.sin(r.t*h.f*6.28+h.ph)*h.amp*Math.min(1,r.t/3):0; // 中盤の揺さぶり
+    h.p=Math.max(h.p, base+wob);                        // 後退はしない
+    if(h.p>=COURSE&&h.goalT===null){ h.goalT=r.t; if(h.e.rank===1) SFX.goal(); }
+    if(h.goalT===null) allDone=false;
+  }
+  r.bg+=ds*230*Math.min(1,Math.max(0,r.t+0.2)/1.5);
+
+  // 実況
+  const leader=[...r.horses].sort((a,b)=>b.p-a.p)[0];
+  if(r.t>2&&r.t-r.commentT>3.2&&!r.finished){
+    r.commentT=r.t;
+    const lp=leader.p/COURSE;
+    r.comment= lp>0.85?`ゴール目前！先頭は ${leader.e.pair}！`
+             : lp>0.5?`後半戦！${leader.e.pair} が引っぱる展開！`
+             : `${leader.e.pair} が飛び出した！`;
+  }
+  if(allDone&&!r.finished){ r.finished=true; r.comment='全馬ゴール！'; }
+  if(r.finished){ r.endTimer+=ds; if(r.endTimer>2.2){ race=null; showResult(); } }
+}
+
+function renderRace(){
+  const r=race; if(!r) return;
+  // 空と芝
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#7ec8ff'); sky.addColorStop(0.25,'#bfe6ff'); sky.addColorStop(0.26,'#3f9e46'); sky.addColorStop(1,'#2c7a33');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+  // 雲
+  ctx.fillStyle='#ffffffcc';
+  for(let i=0;i<3;i++){ const cx=((i*260-r.bg*0.15)%(W+200)+W+200)%(W+200)-100, cy=30+i*26;
+    ctx.beginPath(); ctx.arc(cx,cy,18,0,6.28); ctx.arc(cx+20,cy+5,14,0,6.28); ctx.arc(cx-18,cy+6,13,0,6.28); ctx.fill(); }
+
+  const top=H*0.26, laneH=Math.min(58,(H*0.66)/8);
+  // コース
+  ctx.fillStyle='#4caf50'; ctx.fillRect(0,top-14,W,laneH*8+28);
+  for(let i=0;i<=8;i++){ ctx.strokeStyle='#ffffff55'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(0,top+i*laneH); ctx.lineTo(W,top+i*laneH); ctx.stroke(); }
+  // 距離ポール（流れる背景）
+  ctx.fillStyle='#ffffff99';
+  for(let i=0;i<6;i++){ const px=((i*180-r.bg)%(W+60)+W+60)%(W+60)-30;
+    ctx.fillRect(px,top-14,4,laneH*8+28); }
+
+  // 先頭集団基準のカメラ（相対位置で描く）
+  const sorted=[...r.horses].sort((a,b)=>b.p-a.p);
+  const packC=(sorted[0].p+sorted[sorted.length-1].p)/2;
+  const scale=(W*0.62)/Math.max(140,sorted[0].p-sorted[sorted.length-1].p+140);
+  const baseX=W*0.47;
+
+  // ゴールライン（終盤に登場）
+  const leadP=sorted[0].p;
+  if(leadP>COURSE-400){
+    const gx=baseX+(COURSE-packC)*scale;
+    if(gx<W+40){
+      ctx.fillStyle='#fff'; ctx.fillRect(gx,top-26,6,laneH*8+40);
+      for(let i=0;i<10;i++){ ctx.fillStyle=i%2?'#111':'#fff'; ctx.fillRect(gx-2,top-26+i*(laneH*8+40)/10,10,(laneH*8+40)/10); }
+      ctx.fillStyle='#c0392b'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center'; ctx.fillText('GOAL',gx+4,top-32);
+    }
+  }
+
+  // 馬（枠番順に各レーン）
+  for(const h of r.horses){
+    const lane=h.e.gate-1, y=top+lane*laneH+laneH/2;
+    const x=clamp(baseX+(h.p-packC)*scale, 34, W-30);
+    h.bob+=0.35;
+    const bobY=(r.t>0&&h.goalT===null)?Math.sin(h.bob)*3:0;
+    // 馬体（絵文字を左右反転して右向きに）
+    ctx.save(); ctx.translate(x,y+bobY); ctx.scale(-1,1);
+    ctx.font=(laneH*0.72|0)+'px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('🏇',0,0); ctx.restore();
+    // 枠番バッジ
+    ctx.fillStyle=h.e.col; ctx.strokeStyle='#0006';
+    const bs=15; ctx.fillRect(x-bs-14,y-bs+2,bs*1.6,bs*1.6); ctx.strokeRect(x-bs-14,y-bs+2,bs*1.6,bs*1.6);
+    ctx.fillStyle=h.e.tcol; ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(h.e.gate,x-14-bs+bs*0.8,y+2);
+    // 名前
+    ctx.fillStyle='#ffffffee'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(h.e.pair,x,y-laneH*0.42);
+    // 自分の賭け馬マーク
+    if(bet&&h.e.gate===bet.gate){ ctx.font='14px serif'; ctx.fillText('⭐',x+26,y-laneH*0.18); }
+  }
+
+  // 上部HUD: 現在の順位
+  ctx.fillStyle='#0009'; ctx.fillRect(0,0,W,H*0.15);
+  ctx.textAlign='left'; ctx.fillStyle='#ffe27a'; ctx.font='bold 16px sans-serif';
+  ctx.fillText('🏇 FXレース '+(RACE.practice?'(練習)':RACE.date), 12, 24);
+  ctx.font='12px sans-serif'; ctx.fillStyle='#fff';
+  sorted.slice(0,3).forEach((h,i)=>{ ctx.fillText(`${i+1}位 ${h.e.pair}`, 12+i*(W/3.1), 46); });
+  if(bet){ ctx.fillStyle='#ffe27a';
+    const myPos=sorted.findIndex(h=>h.e.gate===bet.gate)+1;
+    ctx.fillText(`⭐あなたの ${bet.pair} は ${myPos}位`, 12, 66); }
+
+  // 実況テロップ
+  if(r.comment&&r.t>0){
+    ctx.fillStyle='#000a'; ctx.fillRect(0,H-58,W,34);
+    ctx.fillStyle='#fff'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('🎤 '+r.comment, W/2, H-36);
+  }
+
+  // カウントダウン
+  if(r.t<0){
+    ctx.fillStyle='#0007'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#ffe27a'; ctx.font='bold 90px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const n=Math.ceil(-r.t); ctx.fillText(n<=3?n:'🏇',W/2,H/2);
+  } else if(r.t<1){
+    ctx.fillStyle='#ff5252'; ctx.font='bold 70px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.globalAlpha=1-r.t; ctx.fillText('スタート！',W/2,H/2); ctx.globalAlpha=1;
+  }
+}
+
+/* ==================== 結果 ==================== */
+function showResult(){
+  const hit=bet&&bet.rank===1;
+  const payout=hit?Math.floor(100*bet.odds):0;
+  if(hit){ pts+=payout; SFX.win(); } else SFX.lose();
+  Store.setPts(pts);
+
+  document.getElementById('res-title').textContent=hit?'🎯 的中！おめでとう！':'レース結果';
+  document.getElementById('res-sub').innerHTML=(RACE.practice?'🎲 練習レース':'📅 '+RACE.date)+'　1着: <b style="color:#ffe27a">'+RACE.ranked[0].pair+'</b>';
+  const tb=document.getElementById('res-table');
+  tb.innerHTML=RACE.ranked.map(e=>{
+    const cls=(bet&&e.gate===bet.gate)?' class="me"':'';
+    const sign=e.change>0?'+':'';
+    const cc=e.change>0?'up':(e.change<0?'down':'');
+    const medal=e.rank===1?'🥇':e.rank===2?'🥈':e.rank===3?'🥉':e.rank+'着';
+    return `<tr${cls}><td>${medal}</td><td><span class="gate" style="display:inline-flex;background:${e.col};color:${e.tcol};width:20px;height:20px;font-size:11px">${e.gate}</span></td>
+      <td>${e.pair}${bet&&e.gate===bet.gate?' ⭐':''}</td><td class="${cc}" style="text-align:right">${sign}${e.change.toFixed(2)}%</td></tr>`;
+  }).join('');
+  document.getElementById('res-payout').innerHTML= bet?
+    (hit?`⭐ ${bet.pair}（${bet.odds.toFixed(1)}倍）的中！<br><b style="color:#7CFC00;font-size:22px">+${payout}P</b>　持ちP: <span class="pts">${pts}</span>P`
+        :`⭐ ${bet.pair} は ${bet.rank}着…ザンネン！<br>持ちP: <span class="pts">${pts}</span>P`)
+    :'';
+  show('result');
+}
+
+/* ==================== 起動 ==================== */
+updatePts();
+loadRace();
+</script>
+</body>
+</html>
