@@ -28,7 +28,7 @@ function daysAgoStr(n) {
 
 // USDベースで JPY/EUR/GBP/AUD/NZD/CHF のレートを取得し、8ペアに変換する
 async function fetchRatesForDate(dateStr) {
-  const url = `https://api.frankfurter.app/${dateStr}?base=USD&symbols=JPY,EUR,GBP,AUD,NZD,CHF`;
+  const url = `https://api.frankfurter.dev/v1/${dateStr}?base=USD&symbols=JPY,EUR,GBP,AUD,NZD,CHF`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`frankfurter.app fetch failed: ${res.status}`);
   const json = await res.json();

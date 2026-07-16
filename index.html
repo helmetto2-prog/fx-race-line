@@ -163,10 +163,10 @@ async function fetchJSON(url){ const res=await fetch(url); if(!res.ok) throw new
 async function loadRace(){
   const info=document.getElementById('race-info');
   try{
-    const latest=await fetchJSON('https://api.frankfurter.app/latest?base=USD&symbols=JPY,EUR,GBP,AUD,NZD,CHF');
+    const latest=await fetchJSON('https://api.frankfurter.dev/v1/latest?base=USD&symbols=JPY,EUR,GBP,AUD,NZD,CHF');
     const d=new Date(latest.date+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-1);
     const prevDate=d.toISOString().slice(0,10);
-    const prev=await fetchJSON(`https://api.frankfurter.app/${prevDate}?base=USD&symbols=JPY,EUR,GBP,AUD,NZD,CHF`);
+    const prev=await fetchJSON(`https://api.frankfurter.dev/v1/${prevDate}?base=USD&symbols=JPY,EUR,GBP,AUD,NZD,CHF`);
     const cur=pairsFromRates(latest.rates), old=pairsFromRates(prev.rates);
     buildRace(latest.date, code=>((cur[code]-old[code])/old[code])*100, false);
     info.innerHTML=`📅 <b>${latest.date}</b> のレース<br>為替の実データで着順が決まります（${prev.date}→${latest.date}の変化率）`;
