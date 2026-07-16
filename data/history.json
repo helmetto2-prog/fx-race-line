@@ -6,57 +6,57 @@
         "gate": 1,
         "pair": "ドル円",
         "code": "USD/JPY",
-        "rate": "162.3900",
-        "change": 0
+        "rate": "162.2000",
+        "change": -0.11700227846542136
       },
       {
         "gate": 2,
         "pair": "ユーロ円",
         "code": "EUR/JPY",
-        "rate": "185.2224",
-        "change": 0
+        "rate": "185.9942",
+        "change": 0.41673328104511276
       },
       {
         "gate": 3,
         "pair": "ポンド円",
         "code": "GBP/JPY",
-        "rate": "217.6693",
-        "change": 0
+        "rate": "219.1448",
+        "change": 0.6778512736251572
       },
       {
         "gate": 4,
         "pair": "豪ドル円",
         "code": "AUD/JPY",
-        "rate": "113.3929",
-        "change": 0
+        "rate": "113.6730",
+        "change": 0.24699771323123784
       },
       {
         "gate": 5,
         "pair": "NZドル円",
         "code": "NZD/JPY",
-        "rate": "94.4622",
-        "change": 0
+        "rate": "94.9760",
+        "change": 0.5438935373522059
       },
       {
         "gate": 6,
         "pair": "スイスフラン円",
         "code": "CHF/JPY",
-        "rate": "200.1109",
-        "change": 0
+        "rate": "201.0760",
+        "change": 0.4823006607806416
       },
       {
         "gate": 7,
         "pair": "ユーロドル",
         "code": "EUR/USD",
-        "rate": "1.1406",
-        "change": 0
+        "rate": "1.1467",
+        "change": 0.5343607737910921
       },
       {
         "gate": 8,
         "pair": "ポンドドル",
         "code": "GBP/USD",
-        "rate": "1.3404",
-        "change": 0
+        "rate": "1.3511",
+        "change": 0.7957846382490131
       }
     ]
   }
