@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       message:
-        description: "LINEに送る本文"
+        description: "LINEに送る本文（\\n と書くと改行になる。URLの前後には必ず \\n かスペースを置く）"
         required: true
-        default: "🐟 アクア・トト 3D たんけん水族館を公開しました！\n🐢 https://helmetto2-prog.github.io/aquatoto-3d/\nスマホのブラウザで開いて遊べます（読み込みに少し時間がかかります）"
+        default: "🐟 アクア・トト 3D たんけん水族館を公開しました！\\n\\n🐢 https://helmetto2-prog.github.io/aquatoto-3d/ \\n\\nスマホのブラウザで開いて遊べます（読み込みに少し時間がかかります）"
 
 jobs:
   notify:
