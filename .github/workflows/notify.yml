@@ -1,0 +1,27 @@
+name: LINE Notify
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "LINEに送る本文"
+        required: true
+        default: "🐟 アクア・トト 3D たんけん水族館を公開しました！\n🐢 https://helmetto2-prog.github.io/aquatoto-3d/\nスマホのブラウザで開いて遊べます（読み込みに少し時間がかかります）"
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Send LINE
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          NOTIFY_MESSAGE: ${{ inputs.message }}
+        run: node notify.js
