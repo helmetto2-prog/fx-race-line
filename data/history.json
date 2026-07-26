@@ -608,5 +608,66 @@
         "change": 0
       }
     ]
+  },
+  {
+    "date": "2026-07-26",
+    "pairs": [
+      {
+        "gate": 1,
+        "pair": "ドル円",
+        "code": "USD/JPY",
+        "rate": "163.8200",
+        "change": 0
+      },
+      {
+        "gate": 2,
+        "pair": "ユーロ円",
+        "code": "EUR/JPY",
+        "rate": "186.3772",
+        "change": 0
+      },
+      {
+        "gate": 3,
+        "pair": "ポンド円",
+        "code": "GBP/JPY",
+        "rate": "218.2724",
+        "change": 0
+      },
+      {
+        "gate": 4,
+        "pair": "豪ドル円",
+        "code": "AUD/JPY",
+        "rate": "114.4794",
+        "change": 0
+      },
+      {
+        "gate": 5,
+        "pair": "NZドル円",
+        "code": "NZD/JPY",
+        "rate": "94.8197",
+        "change": 0
+      },
+      {
+        "gate": 6,
+        "pair": "スイスフラン円",
+        "code": "CHF/JPY",
+        "rate": "200.3645",
+        "change": 0
+      },
+      {
+        "gate": 7,
+        "pair": "ユーロドル",
+        "code": "EUR/USD",
+        "rate": "1.1377",
+        "change": 0
+      },
+      {
+        "gate": 8,
+        "pair": "ポンドドル",
+        "code": "GBP/USD",
+        "rate": "1.3324",
+        "change": 0
+      }
+    ]
   }
 ]
