@@ -1,9 +1,9 @@
 name: FX Race Daily
 
 on:
-  schedule:
-    # 21:00 UTC = 06:00 JST（GitHub Actionsの無料cronは数分〜十数分遅れることがあります）
-    - cron: "0 21 * * *"
+  # 毎朝の自動送信は 2026-07-27 にユーザー指示で停止（再開するときは下のscheduleを戻す）
+  # schedule:
+  #   - cron: "0 21 * * *"  # 21:00 UTC = 06:00 JST
   workflow_dispatch: {}
 
 permissions:
