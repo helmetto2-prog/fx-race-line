@@ -1,6 +1,8 @@
 name: LINE Notify
 
 on:
+  repository_dispatch:
+    types: [line-notify]
   workflow_dispatch:
     inputs:
       message:
@@ -23,5 +25,5 @@ jobs:
       - name: Send LINE
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
-          NOTIFY_MESSAGE: ${{ inputs.message }}
+          NOTIFY_MESSAGE: ${{ inputs.message || github.event.client_payload.message }}
         run: node notify.js
