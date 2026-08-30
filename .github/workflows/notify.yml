@@ -6,9 +6,13 @@ on:
   workflow_dispatch:
     inputs:
       message:
-        description: "LINEに送る本文（\\n と書くと改行になる。URLの前後には必ず \\n かスペースを置く）"
-        required: true
-        default: "🐟 アクア・トト 3D たんけん水族館を公開しました！\\n\\n🐢 https://helmetto2-prog.github.io/aquatoto-3d/ \\n\\nスマホのブラウザで開いて遊べます（読み込みに少し時間がかかります）"
+        description: "LINEに送る本文（\n と書くと改行になる。URLの前後には必ず \n かスペースを置く）"
+        required: false
+        default: "🐟 アクア・トト 3D たんけん水族館を公開しました！\n\n🐢 https://helmetto2-prog.github.io/aquatoto-3d/ \n\nスマホのブラウザで開いて遊べます（読み込みに少し時間がかかります）"
+      images:
+        description: "画像URL（https）をカンマ区切りで順番に。「本画像|サムネ」と書き分けも可。空なら本文だけ送る"
+        required: false
+        default: ""
 
 jobs:
   notify:
@@ -26,4 +30,5 @@ jobs:
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           NOTIFY_MESSAGE: ${{ inputs.message || github.event.client_payload.message }}
+          NOTIFY_IMAGES: ${{ inputs.images || github.event.client_payload.images }}
         run: node notify.js
