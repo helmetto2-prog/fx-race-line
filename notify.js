@@ -1,4 +1,7 @@
-// 任意メッセージ＋画像をLINEへブロードキャスト（workflow_dispatch「LINE Notify」用）
+// 任意メッセージ＋画像をLINEへ送る（workflow_dispatch「LINE Notify」用）
+// 2026-10-13 義樹さん指示：broadcast（友だち全員）→ push（義樹さんだけ）に変更。
+//   協力者日報で業者さん（いろは苑 北川さん）が同じ公式アカウントを友だち追加したため、まとん・へるさんの通知が業者さんにも届いていた。
+//   宛先は LINE_TO（環境変数）があればそれ、無ければ義樹さんの userId。
 // 入力欄は1行テキストで改行が消えるため、文中の「\n」を本物の改行に変換する。
 // ※URLは前後に改行かスペースを置くこと（直後に日本語が続くとリンクが壊れてスマホで開けない）
 //
@@ -8,6 +11,7 @@
 //   例) https://.../00.jpg|https://.../00_s.jpg, https://.../01.jpg|https://.../01_s.jpg
 //   LINEの制限: 1リクエスト5メッセージまで・JPEG/PNG・10MB以下 → 5枚ずつに分けて順番に送る。
 const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+const to = (process.env.LINE_TO || "U9ca3bbfdcde67012c023af08e8e1569d").trim();
 const text = (process.env.NOTIFY_MESSAGE || "").replace(/\n/g, "\n").trim();
 const images = (process.env.NOTIFY_IMAGES || "")
   .split(/[\s,]+/)
@@ -19,13 +23,13 @@ const images = (process.env.NOTIFY_IMAGES || "")
   });
 
 const post = async (messages) => {
-  const res = await fetch("https://api.line.me/v2/bot/message/broadcast", {
+  const res = await fetch("https://api.line.me/v2/bot/message/push", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ to, messages }),
   });
   const body = await res.text();
-  console.log("LINE broadcast:", res.status, body);
+  console.log("LINE push:", res.status, body);
   if (!res.ok) process.exit(1);
 };
 
