@@ -1,0 +1,29 @@
+name: LINE waku shirabe (ichido kiri)
+# 2026-10-18 まとん：LINEの枠の調べ用。表示名・@ID・数だけ出す（トークン・userIdは出さない）。終わったら消す。
+on:
+  workflow_dispatch: {}
+jobs:
+  shirabe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Shirabe
+        env:
+          T: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+        run: |
+          cat > s.mjs <<'JS'
+          const h = { Authorization: `Bearer ${process.env.T}` };
+          const g = async (p) => { const r = await fetch("https://api.line.me" + p, { headers: h }); let j = null; try { j = await r.json(); } catch {} return { s: r.status, j }; };
+          const info = await g("/v2/bot/info");
+          console.log("INFO", info.s, JSON.stringify({ displayName: info.j?.displayName, basicId: info.j?.basicId }));
+          const q = await g("/v2/bot/message/quota");
+          console.log("QUOTA", q.s, JSON.stringify(q.j));
+          const c = await g("/v2/bot/message/quota/consumption");
+          console.log("CONSUMPTION", c.s, JSON.stringify(c.j));
+          const days = [];
+          for (let d = 25; d <= 30; d++) days.push(`202609${d}`);
+          for (let d = 1; d <= 17; d++) days.push(`202610${String(d).padStart(2, "0")}`);
+          for (const d of days) { const r = await g(`/v2/bot/insight/message/delivery?date=${d}`); console.log("DELIVERY", d, r.s, JSON.stringify(r.j)); }
+          const f = await g("/v2/bot/insight/followers?date=20261017");
+          console.log("FOLLOWERS", f.s, JSON.stringify(f.j));
+          JS
+          node s.mjs
