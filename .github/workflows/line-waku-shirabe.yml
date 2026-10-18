@@ -20,9 +20,9 @@ jobs:
           const c = await g("/v2/bot/message/quota/consumption");
           console.log("CONSUMPTION", c.s, JSON.stringify(c.j));
           const days = [];
-          for (let d = 25; d <= 30; d++) days.push(`202609${d}`);
-          for (let d = 1; d <= 17; d++) days.push(`202610${String(d).padStart(2, "0")}`);
-          for (const d of days) { const r = await g(`/v2/bot/insight/message/delivery?date=${d}`); console.log("DELIVERY", d, r.s, JSON.stringify(r.j)); }
+          const sl = (ms) => new Promise(r => setTimeout(r, ms));
+          for (let d = 3; d <= 17; d++) days.push(`202610${String(d).padStart(2, "0")}`);
+          for (const d of days) { let r; for (let k = 0; k < 4; k++) { r = await g(`/v2/bot/insight/message/delivery?date=${d}`); if (r.s !== 429) break; await sl(60000); } console.log("DELIVERY", d, r.s, JSON.stringify(r.j)); await sl(15000); }
           const f = await g("/v2/bot/insight/followers?date=20261017");
           console.log("FOLLOWERS", f.s, JSON.stringify(f.j));
           JS
