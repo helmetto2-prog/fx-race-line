@@ -26,9 +26,15 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Send LINE
+      - name: Send LINE WORKS (LINE fallback)
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          # 2026-10-18 義樹さん宛ては LINE WORKS のみどり造園ボットへ（5つそろえば LINE WORKS・そろわない／失敗なら LINE）
+          LW_CLIENT_ID: ${{ secrets.LW_CLIENT_ID }}
+          LW_CLIENT_SECRET: ${{ secrets.LW_CLIENT_SECRET }}
+          LW_SERVICE_ACCOUNT: ${{ secrets.LW_SERVICE_ACCOUNT }}
+          LW_PRIVATE_KEY: ${{ secrets.LW_PRIVATE_KEY }}
+          LW_BOT_ID: ${{ secrets.LW_BOT_ID }}
           NOTIFY_MESSAGE: ${{ inputs.message || github.event.client_payload.message }}
           NOTIFY_IMAGES: ${{ inputs.images || github.event.client_payload.images }}
         run: node notify.js
