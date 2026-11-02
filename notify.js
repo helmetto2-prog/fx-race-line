@@ -1,13 +1,15 @@
 // 任意メッセージ＋画像を義樹さんへ送る（workflow_dispatch / repository_dispatch「LINE Notify」用）
 // 2026-10-13 義樹さん指示：broadcast（友だち全員）→ push（義樹さんだけ）に変更。
-//   協力者日報で業者さん（いろは苑 北川さん）が同じ公式アカウントを友だち追加したため、まとん・へるさんの通知が業者さんにも届いていた。
-//   宛先は LINE_TO（環境変数）があればそれ、無ければ義樹さんの userId。
 // 2026-10-18 義樹さん指示：義樹さん宛ての知らせは LINE WORKS の「みどり造園ボット」へ移す。
 //   LINE の公式アカウント（みどり造園 協力者日報）は業者さん専用にする（月200通の枠を業者さんの日報に残すため）。
-//   ・LW_CLIENT_ID / LW_CLIENT_SECRET / LW_SERVICE_ACCOUNT / LW_PRIVATE_KEY / LW_BOT_ID が全部そろっていれば LINE WORKS へ送る。
+//   ・LW_CLIENT_ID / LW_CLIENT_SECRET / LW_SERVICE_ACCOUNT / LW_PRIVATE_KEY / LW_BOT_ID の5つで LINE WORKS へ送る。
 //     宛先は LW_TO（無ければ義樹さんの LINE WORKS ID）。鍵は有給アプリの GAS と同じボットの物（GitHub Secrets に入れる）。
-//   ・そろっていない時、または LINE WORKS で失敗した時だけ、今までの LINE（push）へ回す＝予備の道。
 //   ・鍵・トークンはログに出さない。
+// 2026-11-02 義樹さん指示「LINEはやめておいて。基本的にラインワークスのみでお願いします。私への連絡は」：
+//   LINE への予備の道をやめた。鍵がそろっていない時・LINE WORKS で失敗した時は送らずに、
+//   ログにわけを残して終了コード1（Actions の run が失敗になる）。
+//   長い本文は LINE WORKS の字数の上限（content.text・2000字）で断られていた（10/31・11/1 の 6:40 のまとめ）ので、
+//   行の切れ目で 1800字までに分けて順に送る。それでも長いと断られたら、その1通をさらに半分に分けて送り直す。
 // 入力欄は1行テキストで改行が消えるため、文中の「\n」を本物の改行に変換する。
 // ※URLは前後に改行かスペースを置くこと（直後に日本語が続くとリンクが壊れてスマホで開けない）
 //
@@ -15,12 +17,9 @@
 //   カンマ / 空白 / 改行 区切りで https の画像URLを並べる。並べた順にトークへ届く。
 //   「本画像|サムネ画像」と縦棒で書くとサムネを分けられる（省略時は同じURL）。
 //   例) https://.../00.jpg|https://.../00_s.jpg, https://.../01.jpg|https://.../01_s.jpg
-//   LINEの制限: 1リクエスト5メッセージまで・JPEG/PNG・10MB以下 → 5枚ずつに分けて順番に送る。
 //   LINE WORKS: 1枚ずつ image で送る（previewImageUrl / originalContentUrl）。
 const crypto = require("crypto");
 
-const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-const to = (process.env.LINE_TO || "U9ca3bbfdcde67012c023af08e8e1569d").trim();
 const text = (process.env.NOTIFY_MESSAGE || "").replace(/\n/g, "\n").trim();
 const images = (process.env.NOTIFY_IMAGES || "")
   .split(/[\s,]+/)
@@ -40,30 +39,30 @@ const LW = {
   botId: env("LW_BOT_ID"),
   to: env("LW_TO") || "yoshiki@midori-zoen",
 };
-const lwReady = !!(LW.clientId && LW.clientSecret && LW.serviceAccount && LW.privateKey.trim() && LW.botId);
+const lwMissing = [
+  ["LW_CLIENT_ID", LW.clientId], ["LW_CLIENT_SECRET", LW.clientSecret], ["LW_SERVICE_ACCOUNT", LW.serviceAccount],
+  ["LW_PRIVATE_KEY", LW.privateKey.trim()], ["LW_BOT_ID", LW.botId],
+].filter(([, v]) => !v).map(([k]) => k);
 
-// ---------- LINE（予備の道・2026-10-13 からの push そのまま） ----------
-const linePost = async (messages) => {
-  const res = await fetch("https://api.line.me/v2/bot/message/push", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ to, messages }),
-  });
-  const body = await res.text();
-  console.log("LINE push:", res.status, body);
-  if (!res.ok) process.exit(1);
-};
-const sendLine = async (t, imgs) => {
-  if (!token) { console.log("LINE_CHANNEL_ACCESS_TOKEN 未設定"); process.exit(1); }
-  const lineImages = imgs.map((m) => ({ type: "image", originalContentUrl: m.orig, previewImageUrl: m.prev }));
-  if (t) await linePost([{ type: "text", text: t }]);
-  for (let i = 0; i < lineImages.length; i += 5) {
-    await linePost(lineImages.slice(i, i + 5));
+const TEXT_MAX = 1800;   // LINE WORKS の上限 2000字より少し手前
+const TEXT_MIN = 50;     // 半分に分けるのはここまで
+
+// 行の切れ目で max 字までに分ける（1行が max より長い時だけ行の途中で切る）
+const splitText = (t, max) => {
+  const parts = [];
+  let cur = "";
+  for (const line of t.split("\n")) {
+    const add = cur ? cur + "\n" + line : line;
+    if (add.length <= max) { cur = add; continue; }
+    if (cur) parts.push(cur);
+    let rest = line;
+    while (rest.length > max) { parts.push(rest.slice(0, max)); rest = rest.slice(max); }
+    cur = rest;
   }
-  console.log(`送信完了（LINE）: 本文${t ? 1 : 0}通 / 画像${imgs.length}枚`);
+  if (cur) parts.push(cur);
+  return parts;
 };
 
-// ---------- LINE WORKS（本番の道） ----------
 const b64url = (buf) => Buffer.from(buf).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
 // GAS 側の normalizeKey_ と同じ：1行に詰まった鍵や「\n」と書かれた鍵も PEM に戻す
 const normalizeKey = (k) => {
@@ -100,37 +99,46 @@ const lwPost = async (at, content) => {
     body: JSON.stringify({ content }),
   });
   const body = await res.text();
-  console.log("LINE WORKS:", res.status, content.type, body.slice(0, 200));
-  if (!res.ok) throw new Error(`send ${res.status} ${body.slice(0, 200)}`);
-};
-// 送れた所までを返す（途中で失敗したら、残りだけを LINE へ回すため）
-const sendLW = async (done) => {
-  const at = await lwToken();
-  if (text && !done.text) { await lwPost(at, { type: "text", text }); done.text = true; }
-  for (; done.img < images.length; done.img++) {
-    const m = images[done.img];
-    await lwPost(at, { type: "image", previewImageUrl: m.prev, originalContentUrl: m.orig });
+  console.log("LINE WORKS:", res.status, content.type, content.type === "text" ? `${content.text.length}字` : "", body.slice(0, 200));
+  if (!res.ok) {
+    const e = new Error(`send ${res.status} ${body.slice(0, 200)}`);
+    e.tooLong = /EXCEEDED_LENGTH_LIMIT/.test(body);
+    throw e;
   }
-  console.log(`送信完了（LINE WORKS）: 本文${text ? 1 : 0}通 / 画像${images.length}枚`);
+};
+// 本文1通：字数の上限で断られたら半分に分けて送り直す
+const lwText = async (at, t) => {
+  try {
+    await lwPost(at, { type: "text", text: t });
+    return 1;
+  } catch (e) {
+    if (!e.tooLong || t.length <= TEXT_MIN) throw e;
+    const half = splitText(t, Math.ceil(t.length / 2));
+    console.log(`（長すぎると断られた → ${half.length}つに分けて送り直す）`);
+    let n = 0;
+    for (const p of half) n += await lwText(at, p);
+    return n;
+  }
 };
 
 (async () => {
   if (!text && images.length === 0) { console.log("本文も画像も無し"); process.exit(1); }
-  if (lwReady) {
-    const done = { text: false, img: 0 };
-    try {
-      await sendLW(done);
-      return;
-    } catch (e) {
-      console.log("LINE WORKS 失敗 → LINE へ回す:", String(e.message || e).slice(0, 300));
-      // 送れた分は LINE で二重に送らない
-      if (done.text) { console.log("（本文は LINE WORKS に届いた・残りの画像だけ LINE へ）"); }
-      const restText = done.text ? "" : text;
-      const restImages = images.slice(done.img);
-      if (!restText && restImages.length === 0) return;
-      return sendLine(restText, restImages);
-    }
+  if (lwMissing.length) {
+    console.log(`LINE WORKS の鍵がそろっていない（無い物：${lwMissing.join("・")}）→ 送らない（LINE へは回さない）`);
+    process.exit(1);
   }
-  await sendLine(text, images);
+  let sent = 0, imgSent = 0;
+  try {
+    const at = await lwToken();
+    if (text) for (const p of splitText(text, TEXT_MAX)) sent += await lwText(at, p);
+    for (const m of images) {
+      await lwPost(at, { type: "image", previewImageUrl: m.prev, originalContentUrl: m.orig });
+      imgSent++;
+    }
+  } catch (e) {
+    console.log(`LINE WORKS 失敗 → 送らない（LINE へは回さない）: ${String(e.message || e).slice(0, 300)}`);
+    console.log(`（ここまでに届いた分：本文${sent}通 / 画像${imgSent}枚）`);
+    process.exit(1);
+  }
+  console.log(`送信完了（LINE WORKS）: 本文${sent}通 / 画像${images.length}枚`);
 })();
-

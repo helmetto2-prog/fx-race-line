@@ -2,6 +2,7 @@
 const fs = require("fs");
 const log = process.env.MOCK_LOG;
 const mode = process.env.MOCK_MODE || "ok";
+const max = Number(process.env.MOCK_MAX || 2000);   // LINE WORKS の content.text の上限（本物は 2000字）
 let lwSends = 0;
 globalThis.fetch = async (url, opt = {}) => {
   let body = opt.body;
@@ -15,6 +16,7 @@ globalThis.fetch = async (url, opt = {}) => {
   }
   if (url.startsWith("https://www.worksapis.com/")) {
     lwSends++;
+    if (body.content.type === "text" && body.content.text.length > max) return r(400, { code: "EXCEEDED_LENGTH_LIMIT_OF_PARAM", description: "Maximum content.text length was exceeded." });
     if (mode === "textfail" && lwSends === 1) return r(400, { code: "INVALID_PARAMETER", description: "userId does not exist." });
     if (mode === "img2fail" && lwSends === 3) return r(500, { code: "SERVER_ERROR" });
     return r(201, null);
