@@ -93,5 +93,56 @@ run("上限が小さい→半分に分けて送り直す", { ...LW, LW_PRIVATE_K
 // 14. どうしても通らない（偽物で 10字）＝止める・LINE へは回さない
 run("どうしても通らない→止める", { ...LW, LW_PRIVATE_KEY: pem, MOCK_MAX: "10", NOTIFY_MESSAGE: long }, (c, r) => fail(r) || "終了コード " + r.status);
 
+// ── 2026-11-07 アドレス → 名前つきボタン ──
+const lw = (c) => c.filter((x) => x.url.includes("worksapis")).map((x) => x.body.content);
+const btns = (c) => lw(c).filter((x) => x.type === "button_template");
+const labels = (c) => btns(c).flatMap((x) => x.actions.map((a) => a.label)).join("／");
+const P = "https://helmetto2-prog.github.io/";
+// 15. 11/7 の朝のまとめと同じ形＝本文にアドレスが残らない・ボタンの名前が分かる言葉・1通
+const asa = [
+  "まとんだよー。おはようさー。", "🌅 11月7日（土）の朝刊です",
+  `🌳 造園屋デイリー情報 → ${P}zoennews/`, "クビアカツヤカミキリ、愛知県内16市町村で被害",
+  `📈 株式デイリー情報（週末版） → ${P}zoennews/kabu/`, "日経平均は3,643円安",
+  "▶ 💹 投資部屋：1位 逆張りの辰 今月－0.84%",
+  "▶ 🏕 人類創世ゲーム28年目「ハコビアミの年」：坂で足をひねったカシを運んだ", "🙏 去年の願い「かぶれがすぐ治る草を」",
+  `${P}tanpatsu-news/jinrui/`,
+  "▶ 🦺みどりくんのKY絵本 その71ができました！", "とがった葉の植物は保護メガネから", `${P}tanpatsu-news/ky-ehon71.html`, "きょうもご安全に！",
+  "▶ まとんだよー。KY絵本のスマホアプリができたさー。", `KY絵本アプリを開く→ ${P}tanpatsu-news/ky-app/`,
+  `▶ まとんだよー。人類創世の27年目のアニメ「ヌリカサネの年」をページの案内動画に載せたさー → ${P}tanpatsu-news/jinrui/douga/`,
+].join("\n");
+run("朝のまとめ→ボタン1通", { ...LW, LW_PRIVATE_KEY: pem, NOTIFY_MESSAGE: asa }, (c, r) => {
+  if (r.status !== 0) return "終了コード " + r.status;
+  const w = lw(c);
+  if (w.length !== 1 || w[0].type !== "button_template") return "通の形 " + w.map((x) => x.type).join(",");
+  if (/https?:/.test(w[0].contentText)) return "本文にアドレスが残った";
+  if (!/造園屋デイリー情報\n/.test(w[0].contentText) || /→/.test(w[0].contentText) || /KY絵本アプリを開く/.test(w[0].contentText)) return "本文の残り方\n" + w[0].contentText;
+  if (w[0].actions[2].uri !== `${P}tanpatsu-news/jinrui/`) return "uri";
+  return eq(labels(c), "今日の造園ニュースを読む／今日の株式ニュースを読む／人類創世28年目を読む／KY絵本その71を見る／KY絵本アプリを開く／人類創世27年目のアニメを見る");
+});
+// 16. [名前](URL) と書けばその名前・同じアドレスは1つ・知らない所は矢印の前＋「を開く」、無ければページの題名
+run("名前の決め方", { ...LW, LW_PRIVATE_KEY: pem, NOTIFY_MESSAGE: `できたさー [週刊ニュース第2号を読む](${P}zoennews/w2.html)\nもう一度 ${P}zoennews/w2.html\n名刺の一覧 → https://example.com/x\nhttps://example.com/titled\nhttps://example.com/none` }, (c, r) =>
+  r.status !== 0 ? "終了コード " + r.status : eq(labels(c), "週刊ニュース第2号を読む／名刺の一覧を開く／みどり造園 週刊造園ニュース 第5を開く／ページを開く"));
+// 17. ボタンの形で断られた＝アドレスの字で送る（届かないよりはよい）・ログに出る
+run("ボタンで断られた→字で送る", { ...LW, LW_PRIVATE_KEY: pem, MOCK_MODE: "btnfail", NOTIFY_MESSAGE: asa }, (c, r) => {
+  if (r.status !== 0) return "終了コード " + r.status;
+  if (!/ボタンの形で送れず/.test(r.stdout)) return "ログの行";
+  const t = texts(c).join("\n");
+  return /zoennews\/kabu\//.test(t) && /ky-ehon71\.html/.test(t) && /KY絵本その71を見る/.test(t) || "字の中身\n" + t;
+});
+// 18. アドレスが12本＝10個と2個の2通
+const many = Array.from({ length: 12 }, (_, i) => `KY絵本その${i + 1} ${P}tanpatsu-news/ky-ehon${i + 1}.html`).join("\n");
+run("ボタン12個→2通", { ...LW, LW_PRIVATE_KEY: pem, NOTIFY_MESSAGE: many }, (c, r) => r.status !== 0 ? "終了コード " + r.status : eq(btns(c).map((x) => x.actions.length).join(","), "10,2"));
+// 19. 長い本文＋アドレス＝前は字の知らせ、最後の1000字にボタン・本文は欠けない
+run("長い本文＋ボタン", { ...LW, LW_PRIVATE_KEY: pem, NOTIFY_MESSAGE: long + `\n${P}tanpatsu-news/jinrui/` }, (c, r) => {
+  if (r.status !== 0) return "終了コード " + r.status;
+  const w = lw(c);
+  const b = w[w.length - 1];
+  if (b.type !== "button_template" || b.contentText.length > 1000) return "最後の1通";
+  if (w.slice(0, -1).some((x) => x.type !== "text")) return "前の通";
+  return eq(w.map((x) => x.text || x.contentText).join("\n"), long);
+});
+// 20. アドレスだけ＝決まりの一言＋ボタン
+run("アドレスだけ", { ...LW, LW_PRIVATE_KEY: pem, NOTIFY_MESSAGE: `${P}tanpatsu-news/jinrui/app/` }, (c) => eq(JSON.stringify(lw(c)), JSON.stringify([{ type: "button_template", contentText: "下のボタンから開けます", actions: [{ type: "uri", label: "人類創世アプリを開く", uri: `${P}tanpatsu-news/jinrui/app/` }] }])));
+
 console.log(`\n${n}件中 NG ${ng}件`);
 process.exit(ng ? 1 : 0);
